@@ -1,2 +1,6 @@
+/idea
+/venv_py38
 /venv
 /test
+./config.json
+./log
