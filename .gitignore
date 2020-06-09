@@ -2,5 +2,5 @@
 /venv_py38
 /venv
 /test
-./config.json
+config.json
 ./log
