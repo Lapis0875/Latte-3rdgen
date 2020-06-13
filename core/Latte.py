@@ -4,12 +4,17 @@ from typing import NoReturn, Iterable, Callable, List
 from discord.ext.commands import AutoShardedBot
 import sqlite3
 
-from utils import recursive_container_loop
+from utils import recursive_container_loop, recursive_cog_loop
 
 
 class Latte(AutoShardedBot):
     bot_config: dict = {}
     test_mode: bool = False
+    initial_color: discord.Color = discord.Color.from_rgb(236, 202, 179)
+
+    discord_base_invite: str = "https://discord.gg/"
+    official_community_invite: str = "duYnk96"
+    bug_report_invite: str = "t6vVSYX"
 
     def __init__(self, test_mode: bool = False, *args, **kwargs):
         if "command_prefix" in kwargs:
@@ -20,7 +25,8 @@ class Latte(AutoShardedBot):
         self.test_mode = test_mode
 
         # Set discord & bot`s logger
-        self.logger = self._set_logger()
+        self._set_logger()
+        self.logger = self._get_logger()
 
         # Setup bot
         self._setup()
@@ -35,9 +41,20 @@ class Latte(AutoShardedBot):
         ]
 
     def run(self, *args, **kwargs):
+        # Token is provided in Latte Class`s overrided run method, so pop token arg in args/kwargs
         if "token" in kwargs.keys():
             kwargs.pop("token")
+        # Positional args :
+        # run(*args, **kwargs) -> start(*args, **kwargs) -> login(token, *, bot=True) & connect(reconnect=reconnect)
+        # We can pop all str args to remove token in positional args, because other args are not received as str.
+        for arg in args:
+            if type(arg) == str:
+                del args[(args.index(arg))]
 
+        # Initialize Bot
+        self._init()
+
+        # Run bot using Super-class (discord.ext.commands.AutoSharedBot).
         if self.test_mode:
             self.command_prefix = self.bot_config["test"]["prefix"]
             super().run(self.bot_config["test"]["token"], *args, **kwargs)
@@ -45,9 +62,16 @@ class Latte(AutoShardedBot):
             self.command_prefix = self.bot_config["prefix"]
             super().run(self.bot_config["token"], *args, **kwargs)
 
-    def _set_logger(self) -> logging.Logger:
-        logging.getLogger("discord.gateway").setLevel(logging.WARNING)
+        # Save Datas
+        self._save()
+
+    def _get_logger(self) -> logging.Logger:
         logger: logging.Logger = logging.getLogger(name="discord")
+        return logger
+
+    def _set_logger(self) -> NoReturn:
+        logging.getLogger("discord.gateway").setLevel(logging.WARNING)
+        logger: logging.Logger = self._get_logger()
         logger.setLevel(level=logging.INFO)
 
         console_handler: logging.Handler = logging.StreamHandler(sys.stdout)
@@ -66,7 +90,6 @@ class Latte(AutoShardedBot):
             logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s")
         )
         logger.addHandler(hdlr=file_handler)
-        return logger
 
     def _setup(self) -> NoReturn:
         self.logger.info(msg="Setup Phase :")
@@ -80,27 +103,39 @@ class Latte(AutoShardedBot):
 
     def connect_guild_db(self):
         self.logger.info(msg="Connecting to bot`s guild database...")
-        guild_db = sqlite3.connect(database="./DB/guilds.db")
-        user_db = sqlite3.connect(database="./DB/users.db")
+        guild_db = sqlite3.connect(database="./DB/guilds.sqlite")
+        user_db = sqlite3.connect(database="./DB/users.sqlite")
+
+    def _init(self):
+        self.logger.info(msg="Initialization Phase :")
+        self.event(coro=self.on_ready)
+        self.load_cogs()
 
     def load_cogs(self):
         self.logger.info(msg="Loading bot`s Cogs...")
-        self.load_cog(container=os.listdir(self.bot_config["cogs_dir"]))
+        self.load_cog(dir=self.bot_config["cogs_dir"], exclude=self.bot_config["cogs_exceptions"])
 
-    @recursive_container_loop
+    @recursive_cog_loop
     def load_cog(self, cog_name: str):
+        self.logger.info(msg=f"Adding the Cog `{cog_name}` into bot ..")
         self.load_extension(name=cog_name)
 
     def unload_cogs(self):
         self.logger.info(msg="Unloading bot`s Cogs...")
         self.unload_cog(container=os.listdir(self.bot_config["cogs_dir"]))
 
-    @recursive_container_loop
+    @recursive_cog_loop
     def unload_cog(self, cog_name: str):
+        self.logger.info(msg=f"Removing the Cog `{cog_name}` into bot ..")
         self.remove_cog(name=cog_name)
 
-    def _init(self):
-        self.logger.info(msg="Initialization Phase :")
+    def _save(self):
+        self.logger.info(msg="Save Phase :")
+
+    def save_bot_config(self) -> NoReturn:
+        self.logger.info(msg="Saving bot`s configuration file...")
+        with open(file="./config.json", mode="wt", encoding="utf-8") as config_file:
+            json.dump(obj=self.bot_config, fp=config_file)
 
     async def presence_loop(self):
         """

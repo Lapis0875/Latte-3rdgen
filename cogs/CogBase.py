@@ -1,7 +1,8 @@
 from typing import Type
 
-from discord.ext.commands import Cog, Bot
+from discord.ext.commands import Cog, Context
 from core.Latte import Latte
+from utils.tools import parse_traceback
 
 
 class CogBase(Cog):
@@ -20,16 +21,24 @@ class CogBase(Cog):
     def cog_unload(self):
         self.bot.logger.info(msg=f"Unloading the Cog `{self.qualified_name}`")
 
-    def cog_before_invoke(self, ctx):
-        self.bot.logger.info(msg=f"Unloading the Cog `{self.qualified_name}`")
-        pass
+    def bot_check(self, ctx):
+        self.bot.logger.info(msg=f"[Cog.{self.qualified_name}] [bot_check] Checking the context `{ctx.message.content}`")
+        return True
 
-    def cog_after_invoke(self, ctx):
-        pass
+    def bot_check_once(self, ctx):
+        self.bot.logger.info(msg=f"[Cog.{self.qualified_name}] [bot_check_once] Checking the context `{ctx.message.content}`")
+        return True
 
-    def cog_check(self, ctx):
-        pass
+    async def cog_before_invoke(self, ctx: Context):
+        self.bot.logger.info(msg=f"[Cog.{self.qualified_name}] Invoking the context `{ctx.message.content}`")
 
-    def cog_command_error(self, ctx, error):
+    async def cog_after_invoke(self, ctx: Context):
+        self.bot.logger.info(msg=f"[Cog.{self.qualified_name}] Invoked the context `{ctx.message.content}`")
 
-        pass
+    async def cog_check(self, ctx: Context):
+        self.bot.logger.info(msg=f"[Cog.{self.qualified_name}] [cog_check] Checking the context `{ctx.message.content}`")
+        return True
+
+    async def cog_command_error(self, ctx: Context, error: Type[Exception]):
+        self.bot.logger.info(msg=f"Caught an exception during executing context `{ctx.message.content}`")
+        parse_traceback(exception=error)
