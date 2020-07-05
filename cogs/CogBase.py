@@ -16,7 +16,7 @@ class CogBase(Cog):
 
     def __init__(self, bot: Latte):
         bot.logger.info(msg=f"Registering the Cog `{self.qualified_name}`")
-        self.bot = bot
+        self._bot = bot
 
     def cog_unload(self):
         self.bot.logger.info(msg=f"Unloading the Cog `{self.qualified_name}`")
@@ -39,6 +39,6 @@ class CogBase(Cog):
         self.bot.logger.info(msg=f"[Cog.{self.qualified_name}] [cog_check] Checking the context `{ctx.message.content}`")
         return True
 
-    async def cog_command_error(self, ctx: Context, error: Type[Exception]):
+    async def cog_command_error(self, ctx: Context, error: Exception):
         self.bot.logger.info(msg=f"Caught an exception during executing context `{ctx.message.content}`")
         parse_traceback(exception=error)
