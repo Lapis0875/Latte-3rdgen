@@ -3,6 +3,7 @@ from pytz import timezone, utc
 from typing import NoReturn, Iterable, Callable, List, Union
 from discord.ext.commands import AutoShardedBot
 import sqlite3
+from lavalink import Client as LavalinkClient
 
 from utils import recursive_container_loop, recursive_cog_loop, surpress_exceptions, surpress_cog_exceptions
 
@@ -18,7 +19,14 @@ class Latte(AutoShardedBot):
     bot_config: dict = {}
     test_mode: bool = False
     initial_color: discord.Color = discord.Color.from_rgb(236, 202, 179)
+    warning_color: discord.Color = discord.Color.gold()
+    error_color: discord.Color = discord.Color.red()
     db_dir: str = "./DB/datas.db"
+    do_reboot: bool = False
+
+    # Music Client
+    lavalink: LavalinkClient = None
+    lavalink_host = None
 
     presence_msg_list: List[str] = []
     discord_base_invite: str = "https://discord.gg/"
@@ -79,6 +87,13 @@ class Latte(AutoShardedBot):
         # Initialize Bot
         self._init()
 
+        # Start Lavalink server
+        self.lavalink_host = os.popen("java -jar Lavalink.jar")
+        print(self.lavalink_host)
+        print(self.lavalink_host.name)
+        print(self.lavalink_host.encoding)
+        print(self.lavalink_host.errors)
+
         # Run bot using Super-class (discord.ext.commands.AutoSharedBot).
         if self.test_mode:
             self.command_prefix = self.bot_config["test"]["prefix"]
@@ -90,6 +105,9 @@ class Latte(AutoShardedBot):
 
         # Save Datas
         self._save()
+
+    def check_reboot(self) -> bool:
+        return self.do_reboot and self.is_closed()
 
     @staticmethod
     def __get_logger() -> logging.Logger:
@@ -117,7 +135,7 @@ class Latte(AutoShardedBot):
         KST = timezone("Asia/Seoul")
         current_dt_KST: datetime.datetime = utc.localize(datetime.datetime.now()).astimezone(KST)
         current_dt_KST_month: str = '0' + (str(current_dt_KST.month) if (0 < current_dt_KST.month < 10) else str(current_dt_KST.month))
-        log_filedir = f"./log/Latte/{current_dt_KST.tzname()}%"
+        log_filedir = f"./logs/Latte/{current_dt_KST.tzname()}%"
         log_filedir += f"{current_dt_KST.year}-{current_dt_KST_month}-{current_dt_KST.day}% "
         log_filedir += f"{current_dt_KST.hour}-{current_dt_KST.minute}-{current_dt_KST.second}.txt"
         file_handler: logging.Handler = logging.FileHandler(filename=log_filedir, mode="x", encoding="utf-8")
@@ -127,15 +145,15 @@ class Latte(AutoShardedBot):
         logger.addHandler(hdlr=file_handler)
 
         import os
-        log_files: List[str] = os.listdir("./log/Latte")
+        log_files: List[str] = os.listdir("./logs/Latte")
         if len(log_files) > 7:
             """
-            If log files are stored more than 7, latte will automatically delete logs except recent 7 ones.
+            If logs files are stored more than 7, latte will automatically delete logs except recent 7 ones.
             """
-            logger.info(msg="Too many log files are stored! Deleting except recent 7 logs...")
+            logger.info(msg="Too many logs files are stored! Deleting except recent 7 logs...")
             for log_file in sorted(log_files, reverse=True)[7:]:
-                logger.info(msg=f"Deleting lof file ./log/Latte/{log_file}")
-                os.remove(path=f'./log/Latte/{log_file}')
+                logger.info(msg=f"Deleting lof file ./logs/Latte/{log_file}")
+                os.remove(path=f'./logs/Latte/{log_file}')
 
     @surpress_exceptions
     def _setup(self):
@@ -160,7 +178,7 @@ class Latte(AutoShardedBot):
         datas_db.execute('CREATE TABLE IF NOT EXISTS  "config" ('
                          '"id"	INTEGER NOT NULL UNIQUE, '
                          '"name"    TEXT NOT NULL, '
-                         '"log" INTEGER NOT NULL, '
+                         '"logs" INTEGER NOT NULL, '
                          '"auth_enabled"    TEXT,'
                          '"help_dm"    TEXT,'
                          'PRIMARY KEY("id")'
@@ -208,9 +226,10 @@ class Latte(AutoShardedBot):
             "라떼봇은 라떼를 좋아하는 개발자가 개발했습니다 :P",
             "라떼봇 개발자 : sleepylapis#1608",
             "라떼봇은 현재 개발중입니다!",
-            "버그 제보는 언제나 환영이에요 :D",
-            f"현재 {len(self.guilds)} 개의 서버에서 활동중이에요!"
+            "버그 제보는 언제나 환영이에요 :D"
         ]
+
+        self.lavalink = LavalinkClient(user_id=self.user.id if self.user is not None else self.bot_config["id"])
 
         self.logger.info(msg="Initialization Phase Finished")
 
@@ -312,7 +331,9 @@ class Latte(AutoShardedBot):
         event listener for latte`s on_ready event.
         """
         self.logger.info("봇 온라인!")
-        self.logger.info(f"owner_id : {self.owner_id}")
+        self.logger.info(f"self.owner_id : {self.owner_id}")
+        self.logger.info(f"self.owner_ids : {self.owner_ids}")
+        self.logger.info(f"self.user.id : {self.user.id}")
 
         # 봇의 상태메세지를 지속적으로 변경합니다.
         self.loop.create_task(self.presence_loop())
@@ -320,5 +341,5 @@ class Latte(AutoShardedBot):
     @surpress_exceptions
     async def send_log(self, guild_id: int, log: str):
         datas_db = await self.connect_db()
-        exec_con: sqlite3.Cursor = datas_db.execute(sql="SELECT log FROM config WHERE id=?", parameters=(guild_id,))
+        exec_con: sqlite3.Cursor = datas_db.execute(sql="SELECT logs FROM config WHERE id=?", parameters=(guild_id,))
         await self.get_channel(id=exec_con.fetchall()[0]).send(content=log)

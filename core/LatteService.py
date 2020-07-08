@@ -1,0 +1,2 @@
+class LatteUser:
+    pass

@@ -1,7 +1,6 @@
 from typing import NoReturn, Dict, List
 from discord import Embed, Colour, Color
 
-
 class EmbedFactory:
     # create __slots__ to prevent the creation of __dict__, and also reducing class memory usage.
     __slots__ = ("title", "_title", "description", "_description", "color", "_color", "author", "_author",

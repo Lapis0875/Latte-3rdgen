@@ -1,7 +1,8 @@
 /idea
+/logs
+/DB
+/old
 /venv38
-/venv
 /test
 config.json
-/log
-/DB
+application.yml
